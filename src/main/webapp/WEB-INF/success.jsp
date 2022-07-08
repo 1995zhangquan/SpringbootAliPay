@@ -14,6 +14,7 @@
     <h1>交易成功：</h1><br>
     订单号： ${out_trade_no}<br>
     交易金额：￥${total_amount}<br>
-    支付宝交易号：${trade_no}<br>
+    支付宝交易号：${trade_no}<br><br>
+    <a href="/alipay/showOrderList"><button>查看订单</button></a>
 </body>
 </html>

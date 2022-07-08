@@ -1,9 +1,6 @@
 package com.example.springboottest;
 
-import com.alipay.api.AlipayApiException;
-import com.example.bean.base.OrderModel;
 import com.example.bean.base.UserModel;
-import com.example.bean.business.BalanceAmountModel;
 import com.example.service.OrderService;
 import com.example.service.UserService;
 import com.example.service.alipay.AliPayService;
@@ -12,7 +9,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import javax.annotation.Resource;
-import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
 

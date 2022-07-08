@@ -5,18 +5,23 @@ import com.alipay.api.AlipayApiException;
 import com.alipay.api.AlipayClient;
 import com.alipay.api.DefaultAlipayClient;
 import com.alipay.api.internal.util.AlipaySignature;
+import com.alipay.api.request.AlipayTradeFastpayRefundQueryRequest;
 import com.alipay.api.request.AlipayTradePagePayRequest;
 import com.alipay.api.request.AlipayTradeQueryRequest;
+import com.alipay.api.request.AlipayTradeRefundRequest;
+import com.alipay.api.response.AlipayTradeFastpayRefundQueryResponse;
 import com.alipay.api.response.AlipayTradePagePayResponse;
-import com.alipay.api.response.AlipayTradePayResponse;
+import com.alipay.api.response.AlipayTradeQueryResponse;
+import com.alipay.api.response.AlipayTradeRefundResponse;
+import com.alipay.service.schema.model.enums.SchemaErrorEnum;
 import com.example.bean.base.OrderModel;
-import com.example.bean.business.BalanceAmountModel;
+import com.example.bean.business.AliPayParamsModel;
 import com.example.config.alipay.AliPayConfig;
 import com.example.dao.OrderDao;
+import com.example.util.DateUtil;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
+import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
@@ -27,13 +32,19 @@ import java.util.Map;
 @Service
 public final class AliPayService {
 
-    @Autowired
+    @Resource
     private AliPayConfig aliPayConfig;
-    @Autowired
+    @Resource
     private OrderDao orderDao;
 
-    public String pay(BalanceAmountModel balanceModel) throws AlipayApiException {
-        if (balanceModel.getBalance_money().compareTo(new BigDecimal(0)) <= 0 || balanceModel.getBalance_money().compareTo(new BigDecimal(100000000L)) > 0) {
+    /**
+     * 支付方法
+     * @param payParams
+     * @return
+     * @throws AlipayApiException
+     */
+    public String pay(AliPayParamsModel payParams) throws AlipayApiException {
+        if (payParams.getTotal_amount().compareTo(new BigDecimal(0)) <= 0 || payParams.getTotal_amount().compareTo(new BigDecimal(100000000L)) > 0) {
             return "金额范围不正确！";
         }
         //初始化alipayClient
@@ -47,11 +58,12 @@ public final class AliPayService {
         payRequest.setNotifyUrl(aliPayConfig.getNotify_url());
         //设置参数的集合
         Map<String, Object> bizContent = new HashMap<String, Object>();
-        bizContent.put("out_trade_no", balanceModel.getBalance_id()); //商户订单号
-        bizContent.put("total_amount", balanceModel.getBalance_money()); //订单总金额
-        bizContent.put("subject", balanceModel.getBalance_title()); //商品标题
-        bizContent.put("product_code", "FAST_INSTANT_TRADE_PAY"); //销售产品码
-        bizContent.put("body", balanceModel.getBalance_introduce()); //商品描述
+        bizContent.put("out_trade_no", payParams.getOut_trade_no()); //商户订单号
+        bizContent.put("total_amount", payParams.getTotal_amount()); //订单总金额
+        bizContent.put("subject", payParams.getSubject()); //商品标题
+        bizContent.put("product_code", payParams.getProduct_code()); //销售产品码
+        bizContent.put("body", payParams.getBody()); //商品描述
+        bizContent.put("timestamp", DateUtil.getNowDateTime()); //发送请求的时间，格式"yyyy-MM-dd HH:mm:ss"
         //请求参数都要放置在bizContent里
         payRequest.setBizContent(new JSONObject(bizContent).toString());
         //执行支付操作
@@ -60,7 +72,13 @@ public final class AliPayService {
         return body;
     }
 
-    public String query(String out_trade_no) throws AlipayApiException {
+    /**
+     * 支付查询方法
+     * @param out_trade_no
+     * @return
+     * @throws AlipayApiException
+     */
+    public String payQuery(String out_trade_no) throws AlipayApiException {
         //获得初始化的AlipayClient
         AlipayClient alipayClient = new DefaultAlipayClient(aliPayConfig.gatewayUrl, aliPayConfig.app_id, aliPayConfig.merchant_private_key, "json", aliPayConfig.charset, aliPayConfig.alipay_public_key, aliPayConfig.sign_type);
         AlipayTradeQueryRequest queryRequest = new AlipayTradeQueryRequest();
@@ -71,7 +89,8 @@ public final class AliPayService {
         //outTradeNoObj.put("trade_no")
 
         queryRequest.setBizContent(outTradeNoObj.toString());
-        String body = alipayClient.execute(queryRequest).getBody();
+        AlipayTradeQueryResponse executeRes = alipayClient.execute(queryRequest);
+        String body = executeRes.getBody();
         return body;
     }
 
@@ -132,4 +151,37 @@ public final class AliPayService {
         return true;
     }
 
+    //退款查询接口
+    public String refundQuery(AliPayParamsModel paramsModel) throws AlipayApiException {
+        AlipayClient alipayClient = new DefaultAlipayClient(aliPayConfig.gatewayUrl, aliPayConfig.app_id, aliPayConfig.merchant_private_key, "json", aliPayConfig.charset, aliPayConfig.alipay_public_key, aliPayConfig.sign_type);
+        AlipayTradeFastpayRefundQueryRequest refundQueryRequest = new AlipayTradeFastpayRefundQueryRequest();
+        Map<String, Object> bizContent = new HashMap<String, Object>();
+        bizContent.put("out_trade_no", paramsModel.getOut_trade_no());
+        bizContent.put("out_request_no", paramsModel.getOut_request_no());
+        refundQueryRequest.setBizContent(new JSONObject(bizContent).toString());
+        AlipayTradeFastpayRefundQueryResponse refundQueryResponse = alipayClient.execute(refundQueryRequest);
+        String refundStatus = refundQueryResponse.getRefundStatus();
+        if (!"EFUND_SUCCESS".equals(refundStatus)) {
+            log.error("退款执行失败，错误码：{}，明细错误码：{}，错误原因：{}", refundQueryResponse.getCode(), refundQueryResponse.getSubCode(), refundQueryResponse.getSubMsg());
+        }
+        return refundQueryResponse.getBody();
+    }
+
+    public String refund(AliPayParamsModel paramsModel) throws AlipayApiException {
+        AlipayClient alipayClient = new DefaultAlipayClient(aliPayConfig.gatewayUrl, aliPayConfig.app_id, aliPayConfig.merchant_private_key, "json", aliPayConfig.charset, aliPayConfig.alipay_public_key, aliPayConfig.sign_type);
+        AlipayTradeRefundRequest refundRequest = new AlipayTradeRefundRequest();
+        Map<String, Object> bizContent = new HashMap<String, Object>();
+        bizContent.put("out_trade_no", paramsModel.getOut_trade_no()); //退款订单号
+        bizContent.put("refund_amount", paramsModel.getRefund_amount()); //需要退款的金额，该金额不能大于订单金额，必填
+        bizContent.put("refund_reason", paramsModel.getRefund_reason()); //退款原因
+        bizContent.put("query_options", new String[]{"refund_detail_item_list"}); //退款使用的资金渠道。
+        bizContent.put("out_request_no", paramsModel.getOut_request_no()); //标识一次退款请求，同一笔交易多次退款需要保证唯一，如需部分退款，则此参数必传
+        refundRequest.setBizContent(new JSONObject(bizContent).toString());
+        AlipayTradeRefundResponse refundResponse = alipayClient.execute(refundRequest);
+        String fundChange = refundResponse.getFundChange();
+        if (!("Y".toUpperCase().equals(fundChange))) {
+            log.error("退款失败，错误码：{}，明细错误码：{}，错误原因：{}", refundResponse.getCode(), refundResponse.getSubCode(), refundResponse.getSubMsg());
+        }
+        return refundResponse.getBody();
+    }
 }

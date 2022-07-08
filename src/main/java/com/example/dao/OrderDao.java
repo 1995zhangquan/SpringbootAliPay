@@ -24,7 +24,7 @@ public class OrderDao {
     private JdbcTemplate jdbcTemplate;
 
     public boolean add(OrderModel orderModel) {
-        String sql = "insert into base_order(order_id,order_state,order_money) values(?,?,?)";
+        String sql = "insert into base_order(order_id,order_state,order_money, order_p_id) values(?,?,?,?)";
         KeyHolder keyHolder = new GeneratedKeyHolder();
         int resRow = jdbcTemplate.update(new PreparedStatementCreator() {
             @Override
@@ -33,6 +33,7 @@ public class OrderDao {
                 ps.setString(1,orderModel.getOrder_id());
                 ps.setInt(2,orderModel.getOrder_state());
                 ps.setBigDecimal(3,orderModel.getOrder_money());
+                ps.setString(4,orderModel.getOrder_p_id());
                 return ps;
             }
         },keyHolder);
@@ -56,5 +57,10 @@ public class OrderDao {
         Object[] args = {orderModel.getOrder_state(), orderModel.getOrder_money(), orderModel.getOrder_id()};
         int update = jdbcTemplate.update(sql, args);
         return update > 0;
+    }
+
+    public boolean delete(String orderId) {
+        String sql = "delete from base_order where order_id=?";
+        return jdbcTemplate.update(sql,orderId) > 0;
     }
 }

@@ -20,9 +20,19 @@ public final class IdUtil {
         return sfiw.nextId();
     }
 
-    public static String createOrderId() {
+    public static String createOrderId(Integer trade_state) {
+        String businessCode = "CZ";
         SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHssSSSS");
-        return "OD" + sdf.format(new Date()) + ((int)Math.random() * 10 ) + "z";
+        if (trade_state == null || trade_state == StaticUtil.TRANSACTION_STATUS_PAY) {
+            businessCode = "CZ";
+        } else if (trade_state == StaticUtil.TRANSACTION_STATUS_REFUND) {
+            businessCode = "TK";
+        } else if (trade_state == StaticUtil.TRANSACTION_STATUS_PART_REFUND) {
+            businessCode = "BTK";
+        } else {
+            businessCode = "CZ";
+        }
+        return "OD" + sdf.format(new Date()) + ((int)Math.random() * 10 ) + businessCode;
     }
 
     public static void main(String[] args) {

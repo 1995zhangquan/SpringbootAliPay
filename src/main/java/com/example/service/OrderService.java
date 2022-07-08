@@ -27,4 +27,8 @@ public class OrderService {
     public boolean update(OrderModel model) {
         return dao.update(model);
     }
+
+    public boolean delete(String orderId) {
+        return dao.delete(orderId);
+    }
 }
